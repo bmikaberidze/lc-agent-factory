@@ -8,7 +8,9 @@ class GlobalsConfig(BaseModel):
     set_verbose: bool = False
 
 
-def _validate_single_key_list(field_name: str, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _validate_single_key_list(
+    field_name: str, value: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     for i, entry in enumerate(value):
         if len(entry) != 1:
             raise ValueError(

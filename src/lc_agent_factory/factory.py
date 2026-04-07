@@ -8,11 +8,11 @@ from .config import FactoryConfig
 from .tools import get_tools
 from .middleware import get_custom_middleware, get_prebuilt_middleware
 
+
 # ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
 class LCAgentFactory:
-
     MIDDLEWARE_MODULE = "langchain.agents.middleware"
 
     @staticmethod
@@ -67,7 +67,9 @@ class LCAgentFactory:
         middleware = []
         for midd_cfg in midd_cfgs:
             name, cfg = next(iter(midd_cfg.items()))
-            middleware.append(LCAgentFactory._init_middleware(name, cfg or {}, submodule))
+            middleware.append(
+                LCAgentFactory._init_middleware(name, cfg or {}, submodule)
+            )
         return middleware
 
     @staticmethod
@@ -85,6 +87,7 @@ class LCAgentFactory:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def create_agent(config: dict, **kwargs):
     """Config-driven facade for LangChain's create_agent.

@@ -1,6 +1,7 @@
 from langchain.messages import ToolMessage
 from langchain.agents.middleware import AgentMiddleware
 
+
 class ToolErrorHandler(AgentMiddleware):
     """Return a ToolMessage with an error description when a tool raises."""
 
