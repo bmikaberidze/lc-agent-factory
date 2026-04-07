@@ -1,10 +1,10 @@
 # lc-agent-factory
 
-A thin, config-driven wrapper around [LangChain v1's `create_agent`](https://docs.langchain.com/oss/python/langchain/agents).
+A thin, config-driven wrapper around LangChain's [`create_agent`](https://docs.langchain.com/oss/python/langchain/agents).
 
-`create_agent(config, **kwargs)` accepts the same `**kwargs` as `create_agent`, plus a `config` dict — the factory's contribution: declare your agent's model, middleware, and tools in a plain dict or external file instead of wiring them in code. The returned agent is exactly what `create_agent` returns.
+Our `create_agent(config, **kwargs)` accepts an additional `config` parameter on top of LangChain's `create_agent`'s keyword arguments — letting you declare complex object arguments (e.g. model, middleware, tools) in a plain dict or external file, instead of wiring them in code. The returned agent is exactly what `create_agent` returns. No magic, no lock-in.
 
-> **Note:** Not all `create_agent` [contract](https://reference.langchain.com/python/langchain/agents/factory/create_agent) is config-definable yet — pass unsupported ones directly as kwargs. When the same parameter appears in both, kwargs take priority for scalar values; for lists (e.g. `tools`, `middleware`) config and kwargs are merged with kwargs appended last.
+> **Note:** Not all `create_agent` [parameters](https://reference.langchain.com/python/langchain/agents/factory/create_agent) are configurable yet — pass unsupported ones directly as `kwargs`. When a parameter appears in both, `kwargs` take priority for scalar values, while lists are merged.
 
 ```python
 from lc_agent_factory import create_agent
@@ -12,25 +12,7 @@ from lc_agent_factory import create_agent
 agent = create_agent(config)  # config is just a dict
 ```
 
-`create_agent()` accepts a plain `dict`. Load it however fits your stack — YAML file, JSON, environment variable, database, or constructed directly in code:
-
-```python
-import yaml, json
-
-# from a YAML file (recommended for most projects)
-config = yaml.safe_load(open("config.yaml"))
-
-# from a JSON file
-config = json.load(open("config.json"))
-
-# from an environment variable
-config = json.loads(os.environ["AGENT_CONFIG"])
-
-# constructed in code
-config = {
-    "models": {"primary": {"model_provider": "openai", "model": "gpt-4o"}},
-}
-```
+`create_agent()` accepts a plain `dict`. Load it however fits your stack — YAML file, JSON, environment variable, database, or constructed directly in code.
 
 ---
 
@@ -63,10 +45,11 @@ models:
         model: gemini-2.5-flash
         temperature: 0
 
-prebuilt_middleware:
-    - ModelCallLimitMiddleware:
-          run_limit: 10
-          exit_behavior: 'end'
+middleware:
+    prebuilt:
+        - ModelCallLimitMiddleware:
+              run_limit: 10
+              exit_behavior: 'end'
 ```
 
 **2. Set your API key:**
@@ -81,11 +64,9 @@ export GOOGLE_API_KEY="..."
 import yaml
 from lc_agent_factory import create_agent
 
-agent = create_agent(config)
+agent = create_agent(yaml.safe_load(open("config.yaml")))
 
-res = agent.invoke({"messages": [
-    {"role": "user", "content": "Hello!"},
-]})
+res = agent.invoke({"messages": [ {"role": "user", "content": "Hello!"} ]})
 print(res["messages"][-1].content)
 ```
 
@@ -121,58 +102,59 @@ models:
 
 All keys under a model entry are passed as-is to LangChain's [`init_chat_model`](https://python.langchain.com/api_reference/langchain/chat_models/langchain.chat_models.base.init_chat_model.html) — refer to its docs for available options per provider.
 
-### `prebuilt_middleware` _(optional)_
+### `middleware.prebuilt` _(optional)_
 
 A list of LangChain built-in middleware. Each entry is a single-key dict: `{MiddlewareClassName: {kwargs}}`.
 
 ```yaml
-prebuilt_middleware:
-    # Stop after N model calls
-    - ModelCallLimitMiddleware:
-          run_limit: 10
-          exit_behavior: 'end'
+middleware:
+    prebuilt:
+        # Stop after N model calls
+        - ModelCallLimitMiddleware:
+              run_limit: 10
+              exit_behavior: 'end'
 
-    # Stop after N total tool calls
-    - ToolCallLimitMiddleware:
-          run_limit: 20
+        # Stop after N total tool calls
+        - ToolCallLimitMiddleware:
+              run_limit: 20
 
-    # Per-tool call limit
-    - ToolCallLimitMiddleware:
-          tool_name: 'web_search'
-          run_limit: 5
+        # Per-tool call limit
+        - ToolCallLimitMiddleware:
+              tool_name: 'web_search'
+              run_limit: 5
 
-    # Retry failed model calls
-    - ModelRetryMiddleware:
-          max_retries: 3
-          backoff_factor: 2.0
-          initial_delay: 1.0
+        # Retry failed model calls
+        - ModelRetryMiddleware:
+              max_retries: 3
+              backoff_factor: 2.0
+              initial_delay: 1.0
 
-    # Retry failed tool calls
-    - ToolRetryMiddleware:
-          max_retries: 2
-          backoff_factor: 2.0
-          initial_delay: 1.0
+        # Retry failed tool calls
+        - ToolRetryMiddleware:
+              max_retries: 2
+              backoff_factor: 2.0
+              initial_delay: 1.0
 
-    # Automatically switch to fallback model on failure
-    - ModelFallbackMiddleware:
-          first_model: 'fallback'
+        # Automatically switch to fallback model on failure
+        - ModelFallbackMiddleware:
+              first_model: 'fallback'
 
-    # Trim old tool messages when context grows too large
-    - ContextEditingMiddleware:
-          token_count_method: 'approximate'
-          edits:
-              - ClearToolUsesEdit:
-                    trigger: 50000
-                    keep: 3
-                    clear_tool_inputs: false
-                    placeholder: '[cleared]'
+        # Trim old tool messages when context grows too large
+        - ContextEditingMiddleware:
+              token_count_method: 'approximate'
+              edits:
+                  - ClearToolUsesEdit:
+                        trigger: 50000
+                        keep: 3
+                        clear_tool_inputs: false
+                        placeholder: '[cleared]'
 ```
 
 Kwargs are passed as-is to LangChain middleware constructors — refer to [LangChain middleware docs](https://python.langchain.com/docs/concepts/agents/#middleware) for the full list and options.
 
-### `custom_middleware` _(optional)_
+### `middleware.custom` _(optional)_
 
-Same structure as `prebuilt_middleware`, for your own `AgentMiddleware` subclasses.
+Same structure as `middleware.prebuilt`, for your own `AgentMiddleware` subclasses.
 
 ---
 

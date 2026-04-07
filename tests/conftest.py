@@ -60,11 +60,11 @@ def invoke_fn(request):
 
 
 def make_agent(model, middleware_cfg: list[dict], tools: list = None) -> object:
-    """Build an agent with a fake model and the given prebuilt_middleware config."""
+    """Build an agent with a fake model and the given middleware.prebuilt config."""
     config = {
         "globals": {"set_debug": False, "set_verbose": False},
         "models": {"primary": {"model_provider": "fake", "model": "fake"}},
-        "prebuilt_middleware": middleware_cfg,
+        "middleware": {"prebuilt": middleware_cfg},
     }
     with patch.object(LCAgentFactory, "_init_model", return_value=model):
         return LCAgentFactory.create(config, tools=tools or [])

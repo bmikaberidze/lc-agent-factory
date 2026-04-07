@@ -26,7 +26,7 @@ def test_fallback_model_is_registered():
             "primary": {"model_provider": "fake", "model": "fake-primary"},
             "fallback": {"model_provider": "fake", "model": "fake-fallback"},
         },
-        "prebuilt_middleware": MIDDLEWARE_CFG,
+        "middleware": {"prebuilt": MIDDLEWARE_CFG},
     }
 
     def mock_init_model(cfg, key):
@@ -45,9 +45,9 @@ def test_fallback_missing_model_key_is_skipped():
     config = {
         "globals": {"set_debug": False, "set_verbose": False},
         "models": {"primary": {"model_provider": "fake", "model": "fake"}},
-        "prebuilt_middleware": [
+        "middleware": {"prebuilt": [
             {"ModelFallbackMiddleware": {"first_model": "nonexistent"}},
-        ],
+        ]},
     }
 
     def mock_init_model(cfg, key):

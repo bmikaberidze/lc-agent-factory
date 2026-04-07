@@ -37,7 +37,7 @@ def get_prebuilt_middleware(config: dict):
     from ..factory import LCAgentFactory
 
     middleware = []
-    midd_cfgs: list[dict] = config.get("prebuilt_middleware", [])
+    midd_cfgs: list[dict] = config.get("middleware", {}).get("prebuilt", [])
 
     # --- complex middleware (requires nested init logic) ---
 

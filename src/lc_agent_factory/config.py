@@ -21,11 +21,11 @@ def _validate_single_key_list(field_name: str, value: list[dict[str, Any]]) -> l
 class FactoryConfig(BaseModel):
     """Validates the parts of the config consumed by lc-agent-factory.
 
-    - globals:              fully validated (known shape), optional
-    - models:               structure validated (named dict of dicts); contents
-                            passed as-is to init_chat_model — LangChain validates
-    - prebuilt_middleware:  optional, structure validated (list of single-key dicts)
-    - custom_middleware:    optional, structure validated (list of single-key dicts)
+    - globals:                  fully validated (known shape), optional
+    - models:                   structure validated (named dict of dicts); contents
+                                passed as-is to init_chat_model — LangChain validates
+    - middleware.prebuilt:      optional, structure validated (list of single-key dicts)
+    - middleware.custom:        optional, structure validated (list of single-key dicts)
 
     Any extra keys are silently ignored.
     """
@@ -34,8 +34,7 @@ class FactoryConfig(BaseModel):
 
     globals: GlobalsConfig = GlobalsConfig()
     models: dict[str, dict[str, Any]] = {}
-    prebuilt_middleware: list[dict[str, Any]] = []
-    custom_middleware: list[dict[str, Any]] = []
+    middleware: dict[str, list[dict[str, Any]]] = {"prebuilt": [], "custom": []}
 
     @classmethod
     @field_validator("models")
@@ -45,6 +44,8 @@ class FactoryConfig(BaseModel):
         return v
 
     @classmethod
-    @field_validator("prebuilt_middleware", "custom_middleware")
-    def middleware_entries_are_single_key(cls, v, info):
-        return _validate_single_key_list(info.field_name, v)
+    @field_validator("middleware")
+    def middleware_entries_are_single_key(cls, v):
+        for key in ("prebuilt", "custom"):
+            _validate_single_key_list(f"middleware.{key}", v.get(key, []))
+        return v
