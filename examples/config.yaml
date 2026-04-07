@@ -1,0 +1,120 @@
+globals:
+  set_debug: true
+  set_verbose: true
+
+models:
+
+  primary:
+    model_provider: google_genai
+    model: gemini-3-pro-preview
+    timeout: 120
+    temperature: 0
+    thinking_level: low
+
+  fallback:
+    model_provider: google_genai
+    model: gemini-2.5-flash
+    timeout: 60
+    temperature: 0
+    thinking_budget: 0
+
+  summary:
+    model_provider: google_genai
+    model: gemini-3-pro-preview
+    timeout: 60
+    temperature: 0.7
+    thinking_level: high
+
+
+custom_middleware:
+  - ToolErrorHandler: {}
+
+prebuilt_middleware:
+
+  # Call Limits
+  - ModelCallLimitMiddleware:
+      run_limit: 3
+      exit_behavior: end
+      # thread_limit=10,
+
+  - ToolCallLimitMiddleware:
+      run_limit: 5
+      # thread_limit=20, 
+
+  # Retry Limits
+  - ModelRetryMiddleware:
+      max_retries: 3
+      backoff_factor: 2.0
+      initial_delay: 1.0
+
+  - ToolRetryMiddleware:
+      max_retries: 2
+      backoff_factor: 2.0
+      initial_delay: 1.0
+  
+  # To Do List
+  - TodoListMiddleware: {}
+      # system_prompt: "" # Custom system prompt for guiding todo usage. Uses built-in prompt if not specified.
+      # tool_description: "" # Custom description for the write_todos tool. Uses built-in description if not specified.
+
+  # Personal Identifiable Information (PII) Detection and Handling
+  - PIIMiddleware:
+      pii_type: email 
+        # Can be a built-in type (email, credit_card, ip, mac_address, url) or a custom type name.
+      strategy: redact
+        # 'block' - Raise exception when detected
+        # 'redact' - Replace with [REDACTED_{PII_TYPE}]
+        # 'mask' - Partially mask (e.g., ****-****-****-1234)
+        # 'hash' - Replace with deterministic hash
+      apply_to_input: true
+      apply_to_output: false
+      apply_to_tool_results: false
+
+  - PIIMiddleware:
+      pii_type: credit_card
+      strategy: mask
+
+  # Fallback Model
+  - ModelFallbackMiddleware:
+      first_model: fallback
+
+  # Context Editing
+  - ContextEditingMiddleware:
+      token_count_method: approximate # 'approximate' or 'model'
+      edits:
+        - ClearToolUsesEdit:
+            trigger: 50000
+            keep: 3
+            clear_tool_inputs: False
+            exclude_tools: []
+            placeholder: '[cleared]'
+            clear_at_least: 0
+        # - ClearToolUsesEdit:
+        #     trigger: 90000
+        #     keep: 3
+ 
+  # ContextSize = ContextFraction | ContextTokens | ContextMessages
+  # context_size: ContextSize = ("fraction", 0.5) | ("tokens", 3000) | ("messages", 50)
+  - SummarizationMiddleware:
+      model: summary
+      trigger: # ContextSize | list[ContextSize] | None
+        - ["tokens", 3000]
+        - ["messages", 10]
+      keep: # ContextSize default: ('messages', 20)
+        ["messages", 3]
+      # token_counter: # function # Custom token counting function. Defaults to character-based counting.
+      # summary_prompt: # string # Custom prompt template for summarization. Uses built-in template if not specified. The template should include {messages} placeholder where conversation history will be inserted.
+      # trim_tokens_to_summarize: # number default: 4000 # Maximum number of tokens to include when generating the summary. Messages will be trimmed to fit this limit before summarization.
+
+  - FilesystemFileSearchMiddleware:
+      root_path: "/workspace" # Root directory to search. All file operations are relative to this path.
+      use_ripgrep: True # Whether to use ripgrep for search. Falls back to Python regex if ripgrep is unavailable.
+      max_file_size_mb: 10 # Maximum file size to search in MB. Files larger than this are skipped.
+
+  # - FilesystemMiddleware:
+  #     backend: null  # Optional: custom backend (defaults to StateBackend)
+  #     system_prompt: Write to the filesystem when...  # Optional custom addition to the system prompt
+  #     custom_tool_descriptions:
+  #       ls: Use the ls tool when...
+  #       read_file: Use the read_file tool to...
+  #       # Optional: Custom descriptions for filesystem tools
