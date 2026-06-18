@@ -38,15 +38,15 @@ class FactoryConfig(BaseModel):
     models: dict[str, dict[str, Any]] = {}
     middleware: dict[str, list[dict[str, Any]]] = {"prebuilt": [], "custom": []}
 
-    @classmethod
     @field_validator("models")
+    @classmethod
     def primary_model_required(cls, v):
         if not v.get("primary"):
             raise ValueError("config.models.primary is required")
         return v
 
-    @classmethod
     @field_validator("middleware")
+    @classmethod
     def middleware_entries_are_single_key(cls, v):
         for key in ("prebuilt", "custom"):
             _validate_single_key_list(f"middleware.{key}", v.get(key, []))

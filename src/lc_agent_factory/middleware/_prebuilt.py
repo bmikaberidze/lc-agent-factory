@@ -26,9 +26,15 @@ from ..utils.enums import ComplexPrebuiltMiddlewareSE
 # Subagent                Add the ability to spawn subagents.
 
 
-def _find_midd_cfg(midd_cfgs: list[dict], name: str) -> dict | None:
-    """Return the config dict for the first entry matching name, or None."""
-    return next((m[name] for m in midd_cfgs if name in m), None)
+_NOT_FOUND = object()
+
+
+def _find_midd_cfg(midd_cfgs: list[dict], name: str):
+    """Return the config dict for the first entry matching name, {} if entry is bare, or None if missing."""
+    found = next((m[name] for m in midd_cfgs if name in m), _NOT_FOUND)
+    if found is _NOT_FOUND:
+        return None
+    return found or {}
 
 
 def get_prebuilt_middleware(config: dict):
@@ -42,10 +48,11 @@ def get_prebuilt_middleware(config: dict):
     # --- complex middleware (requires nested init logic) ---
 
     fallback_cfg = _find_midd_cfg(midd_cfgs, ComplexPrebuiltMiddlewareSE.MODEL_FALLBACK)
-    if fallback_cfg:
-        fallback_model = LCAgentFactory._init_model(
-            config, fallback_cfg.get("first_model")
+    if fallback_cfg is not None:
+        first_model_key = fallback_cfg.get("first_model") or (
+            "fallback" if "fallback" in config.get("models", {}) else None
         )
+        fallback_model = LCAgentFactory._init_model(config, first_model_key)
         if fallback_model:
             middleware.append(ModelFallbackMiddleware(first_model=fallback_model))
 

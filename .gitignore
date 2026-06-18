@@ -44,3 +44,7 @@ htmlcov/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# PyPI
+.pypirc
+PyPI-Recovery-Codes-*.txt
