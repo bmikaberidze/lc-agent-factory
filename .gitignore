@@ -48,3 +48,6 @@ htmlcov/
 # PyPI
 .pypirc
 PyPI-Recovery-Codes-*.txt
+
+# Agents
+.agents/
