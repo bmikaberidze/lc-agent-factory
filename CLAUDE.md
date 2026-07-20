@@ -55,3 +55,7 @@ hatch publish             # upload to PyPI
 ## Adding tools
 
 Return tool instances from `get_tools(config)` in `tools/__init__.py`. Extra tools can also be passed at call time via `create_agent.create(config, tools=[...])`.
+
+## Roadmap
+
+Workspace-wide deferred features live in `../docs/roadmap.md` (see the "lc-agent-factory/" section). Consult when a task touches a listed item. **Mutations (mark-done, remove, add) require explicit operator approval** — propose the change first, edit only after a "yes". Never silently mutate.
