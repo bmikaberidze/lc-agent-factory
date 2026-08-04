@@ -66,11 +66,29 @@ def get_prebuilt_middleware(config: dict):
             trigger = tuple(trigger)
         keep = tuple(sum_cfg.get("keep"))
         if sum_model and trigger and keep:
+            # summary_prompt / trim_tokens_to_summarize are omitted rather than
+            # passed as None: LangChain's defaults are module constants, and
+            # forwarding None would override them with a null instead.
+            optional = {
+                k: sum_cfg[k]
+                for k in ("summary_prompt", "trim_tokens_to_summarize")
+                if k in sum_cfg
+            }
+            # LangChain renders the prompt with .format(messages=...); a template
+            # missing the placeholder formats to itself, so the summarizer would
+            # silently run with no history at all. Fail at build instead.
+            if "{messages}" not in optional.get("summary_prompt", "{messages}"):
+                raise ValueError(
+                    "SummarizationMiddleware.summary_prompt must contain the "
+                    "'{messages}' placeholder — without it the conversation "
+                    "history is never interpolated into the prompt."
+                )
             middleware.append(
                 SummarizationMiddleware(
                     model=sum_model,
                     trigger=trigger,
                     keep=keep,
+                    **optional,
                 )
             )
 

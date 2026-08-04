@@ -1,6 +1,6 @@
 [project]
 name = "lc-agent-factory"
-version = "0.1.0"
+version = "0.1.1"
 description = "Config-driven LangChain create_agent wrapper"
 readme = "README.md"
 requires-python = ">=3.10"
