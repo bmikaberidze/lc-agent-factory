@@ -37,6 +37,37 @@ def _find_midd_cfg(midd_cfgs: list[dict], name: str):
     return found or {}
 
 
+def _validate_summary_prompt(prompt: str) -> None:
+    """Reject a summary_prompt that str.format cannot render.
+
+    LangChain calls `summary_prompt.format(messages=...)` and wraps it in a bare
+    `except Exception` that returns the string "Error generating summary: ..."
+    — which it then writes into state *in place of the whole conversation*.
+    A single stray brace (an operator pasting a JSON example into the prompt)
+    therefore does not raise: it silently and permanently destroys the thread's
+    history, one checkpoint at a time, with no log and no failed request.
+
+    Two ways to render nothing, both fatal, both checked here:
+      - the template omits {messages}, so history is never interpolated;
+      - the template has a brace .format() chokes on (KeyError/IndexError/ValueError).
+    """
+    if "{messages}" not in prompt:
+        raise ValueError(
+            "SummarizationMiddleware.summary_prompt must contain the "
+            "'{messages}' placeholder — without it the conversation history "
+            "is never interpolated into the prompt."
+        )
+    try:
+        prompt.format(messages="")
+    except (KeyError, IndexError, ValueError) as e:
+        raise ValueError(
+            "SummarizationMiddleware.summary_prompt is not a valid str.format "
+            f"template ({type(e).__name__}: {e}). Every literal brace must be "
+            "doubled ('{{' and '}}') — LangChain swallows the format error and "
+            "replaces the conversation history with the error text."
+        ) from e
+
+
 def get_prebuilt_middleware(config: dict):
     """Get built-in middleware for the agent."""
 
@@ -66,23 +97,21 @@ def get_prebuilt_middleware(config: dict):
             trigger = tuple(trigger)
         keep = tuple(sum_cfg.get("keep"))
         if sum_model and trigger and keep:
-            # summary_prompt / trim_tokens_to_summarize are omitted rather than
-            # passed as None: LangChain's defaults are module constants, and
-            # forwarding None would override them with a null instead.
-            optional = {
-                k: sum_cfg[k]
-                for k in ("summary_prompt", "trim_tokens_to_summarize")
-                if k in sum_cfg
-            }
-            # LangChain renders the prompt with .format(messages=...); a template
-            # missing the placeholder formats to itself, so the summarizer would
-            # silently run with no history at all. Fail at build instead.
-            if "{messages}" not in optional.get("summary_prompt", "{messages}"):
-                raise ValueError(
-                    "SummarizationMiddleware.summary_prompt must contain the "
-                    "'{messages}' placeholder — without it the conversation "
-                    "history is never interpolated into the prompt."
-                )
+            # Both keys are omitted rather than passed as None when absent:
+            # LangChain's defaults are module constants, and forwarding None
+            # would override them with a null instead.
+            #
+            # The two differ on what an *explicit* null means. `None` is a
+            # meaningful value for trim_tokens_to_summarize — it disables
+            # trimming — so it is forwarded. There is no useful null prompt, so
+            # `summary_prompt: null` is treated as "unset" rather than crashing
+            # the build on a config that plainly meant "use the default".
+            optional = {}
+            if "trim_tokens_to_summarize" in sum_cfg:
+                optional["trim_tokens_to_summarize"] = sum_cfg["trim_tokens_to_summarize"]
+            if sum_cfg.get("summary_prompt") is not None:
+                _validate_summary_prompt(sum_cfg["summary_prompt"])
+                optional["summary_prompt"] = sum_cfg["summary_prompt"]
             middleware.append(
                 SummarizationMiddleware(
                     model=sum_model,

@@ -81,6 +81,34 @@ def test_prompt_without_placeholder_raises():
         make_agent(fake_model("hello"), _cfg(summary_prompt="Summarize in Georgian."))
 
 
+def test_prompt_with_stray_brace_raises():
+    """A brace .format() chokes on is worse than a crash — it eats the thread.
+
+    LangChain wraps .format() in a bare `except Exception` and returns
+    "Error generating summary: ...", which replaces the entire conversation.
+    Nothing raises, nothing logs, and the damage is written to the checkpoint.
+    """
+    pasted_json = 'Example: {"code_id": "28216"}\n{messages}'
+    with pytest.raises(ValueError, match="not a valid str.format template"):
+        make_agent(fake_model("hello"), _cfg(summary_prompt=pasted_json))
+
+
+def test_prompt_with_doubled_braces_is_accepted():
+    """Correctly escaped literal braces must still pass."""
+    escaped = 'Example: {{"code_id": "28216"}}\n{messages}'
+    mw = _summarizer(_cfg(summary_prompt=escaped))
+
+    assert mw.summary_prompt == escaped
+    assert '{"code_id": "28216"}' in mw.summary_prompt.format(messages="H")
+
+
+def test_null_summary_prompt_falls_back_to_default():
+    """There is no useful null prompt, so a null means 'unset', not a crash."""
+    mw = _summarizer(_cfg(summary_prompt=None))
+
+    assert mw.summary_prompt == DEFAULT_SUMMARY_PROMPT
+
+
 def test_agent_still_responds_with_custom_prompt():
     """Pass-through must not disturb normal agent operation."""
     custom = "Summarize.\n{messages}"
