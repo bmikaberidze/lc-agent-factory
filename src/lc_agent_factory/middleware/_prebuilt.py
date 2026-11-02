@@ -68,6 +68,43 @@ def _validate_summary_prompt(prompt: str) -> None:
         ) from e
 
 
+def _fallback_chain(config: dict, fallback_cfg: dict) -> list:
+    """The backup models, in the order they are tried: `first_model`, then each of
+    `additional_models`. All are keys of `config.models`.
+
+    `first_model` defaults to `fallback` when that model is declared. An unknown
+    `first_model` skips the middleware (the old behaviour, kept). `additional_models`
+    is new and strict: a non-list or an unknown key raises, so a typo cannot quietly
+    drop a backup, and it needs a `first_model` to follow.
+    """
+    from ..factory import LCAgentFactory
+
+    models = config.get("models", {})
+    first_key = fallback_cfg.get("first_model") or ("fallback" if "fallback" in models else None)
+    additional_keys = fallback_cfg.get("additional_models") or []
+    if not isinstance(additional_keys, list) or not all(isinstance(k, str) for k in additional_keys):
+        raise ValueError(
+            "ModelFallbackMiddleware.additional_models must be a list of model names "
+            f"(keys of models), got: {additional_keys!r}"
+        )
+    unknown = [k for k in additional_keys if k not in models]
+    if unknown:
+        raise ValueError(
+            f"ModelFallbackMiddleware.additional_models names unknown models {unknown}; "
+            f"declared: {sorted(models)}"
+        )
+
+    first_model = LCAgentFactory._init_model(config, first_key)
+    if not first_model:
+        if additional_keys:
+            raise ValueError(
+                "ModelFallbackMiddleware.additional_models needs a first_model: "
+                f"{first_key!r} is not in models and no 'fallback' model is declared"
+            )
+        return []
+    return [first_model, *(LCAgentFactory._init_model(config, k) for k in additional_keys)]
+
+
 def get_prebuilt_middleware(config: dict):
     """Get built-in middleware for the agent."""
 
@@ -80,12 +117,9 @@ def get_prebuilt_middleware(config: dict):
 
     fallback_cfg = _find_midd_cfg(midd_cfgs, ComplexPrebuiltMiddlewareSE.MODEL_FALLBACK)
     if fallback_cfg is not None:
-        first_model_key = fallback_cfg.get("first_model") or (
-            "fallback" if "fallback" in config.get("models", {}) else None
-        )
-        fallback_model = LCAgentFactory._init_model(config, first_model_key)
-        if fallback_model:
-            middleware.append(ModelFallbackMiddleware(first_model=fallback_model))
+        fallback_models = _fallback_chain(config, fallback_cfg)
+        if fallback_models:
+            middleware.append(ModelFallbackMiddleware(*fallback_models))
 
     sum_cfg = _find_midd_cfg(midd_cfgs, ComplexPrebuiltMiddlewareSE.SUMMARIZATION)
     if sum_cfg:
