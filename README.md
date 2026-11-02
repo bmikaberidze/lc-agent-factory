@@ -135,9 +135,13 @@ middleware:
               backoff_factor: 2.0
               initial_delay: 1.0
 
-        # Automatically switch to fallback model on failure
+        # Automatically switch to fallback model on failure.
+        # first_model defaults to 'fallback' when that model is declared.
+        # additional_models (optional) are tried in order after it;
+        # an unknown name there raises at build.
         - ModelFallbackMiddleware:
               first_model: 'fallback'
+              additional_models: ['fallback_2']
 
         # Trim old tool messages when context grows too large
         - ContextEditingMiddleware:
